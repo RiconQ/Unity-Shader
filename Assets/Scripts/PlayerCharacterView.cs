@@ -5,7 +5,7 @@ using KinematicCharacterController;
 public class PlayerCharacterView : MonoBehaviour, ICharacterController
 {
     [Header("Reference")]
-    [SerializeField] private KinematicCharacterMotor m_moter;
+    [SerializeField] private KinematicCharacterMotor m_motor;
     [SerializeField] private GameInputReader m_inputReader;
 
     [Header("Setting")]
@@ -13,10 +13,11 @@ public class PlayerCharacterView : MonoBehaviour, ICharacterController
 
     private PlayerViewModel m_playerViewModel;
     private Transform m_mainCameraTransform;
+    private bool m_jumpRequested = false;
 
     private void Awake()
     {
-        m_moter.CharacterController = this;
+        m_motor.CharacterController = this;
         m_playerViewModel = new(m_playerStat);
 
         m_mainCameraTransform = Camera.main.transform;
@@ -34,18 +35,52 @@ public class PlayerCharacterView : MonoBehaviour, ICharacterController
         m_inputReader.JumpInput
             .Subscribe(value => m_playerViewModel.JumpRequest.OnNext(Unit.Default))
             .AddTo(this);
+
+        m_playerViewModel.JumpRequest
+            .Subscribe(value => m_jumpRequested = true)
+            .AddTo(this);
     }
 
     public void UpdateVelocity(ref Vector3 currentVelocity, float deltaTime)
     {
+        var isGrounded = m_motor.GroundingStatus.IsStableOnGround;
+
+        // 이동 로직
+        var finalVelocity = m_playerViewModel.CalculateVelocity(
+                currentVelocity,
+                m_mainCameraTransform.rotation,
+                isGrounded,
+                deltaTime
+            );
+
+        // 점프 로직
+        if (m_jumpRequested)
+        {
+            // 땅에 있을때 점프
+            if (isGrounded)
+            {
+                m_motor.ForceUnground();
+
+                finalVelocity.y = m_playerViewModel.CalculateJumpVelocity();
+            }
+
+            m_jumpRequested = false;
+        }
+
+        // 최종 속도 적용
+        currentVelocity = finalVelocity;
     }
 
     public void UpdateRotation(ref Quaternion currentRotation, float deltaTime)
     {
-        //var forward = Vector3.ProjectOnPlane
-        //(
-        //
-        //);
+        var newRotation = m_playerViewModel.CalculateTargetRotation
+        (
+            currentRotation,
+            m_mainCameraTransform.rotation,
+            deltaTime
+        );
+
+        currentRotation = newRotation;
     }
 
     public void ProcessHitStabilityReport(Collider hitCollider, Vector3 hitNormal, Vector3 hitPoint, Vector3 atCharacterPosition, Quaternion atCharacterRotation, ref HitStabilityReport hitStabilityReport)
@@ -66,7 +101,7 @@ public class PlayerCharacterView : MonoBehaviour, ICharacterController
 
     public bool IsColliderValidForCollisions(Collider coll)
     {
-        throw new System.NotImplementedException();
+        return true;
     }
 
     public void BeforeCharacterUpdate(float deltaTime)

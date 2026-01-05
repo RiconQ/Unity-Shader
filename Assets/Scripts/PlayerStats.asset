@@ -12,5 +12,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: fcab78ef6394f8b4f98c74cd4c1975b8, type: 3}
   m_Name: PlayerStats
   m_EditorClassIdentifier: Assembly-CSharp::PlayerStats
+  RotationSpeed: 10
   MoveSpeed: 10
   JumpForce: 5
