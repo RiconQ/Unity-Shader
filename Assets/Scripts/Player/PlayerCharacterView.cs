@@ -26,12 +26,12 @@ public class PlayerCharacterView : MonoBehaviour, ICharacterController
     private void Start()
     {
         // Input Binding
-        // ÀÌµ¿ ÀÔ·Â
+        // ì´ë™ ì…ë ¥
         m_inputReader.MoveInput
             .Subscribe(value => m_playerViewModel.InputDirection.Value = value)
             .AddTo(this);
 
-        // Á¡ÇÁ ÀÔ·Â
+        // ì í”„ ì…ë ¥
         m_inputReader.JumpInput
             .Subscribe(value => m_playerViewModel.JumpRequest.OnNext(Unit.Default))
             .AddTo(this);
@@ -39,13 +39,19 @@ public class PlayerCharacterView : MonoBehaviour, ICharacterController
         m_playerViewModel.JumpRequest
             .Subscribe(value => m_jumpRequested = true)
             .AddTo(this);
+
+        // ë‹¬ë¦¬ê¸° ì…ë ¥ 
+        // inputReaderì˜ SprintInputê°’ì´ ë°”ë€Œë©´ viewModelì˜ IsSprinting ê°’ ë³€ê²½
+        m_inputReader.SprintInput
+            .Subscribe(value => m_playerViewModel.IsSprinting.Value = value)
+            .AddTo(this);
     }
 
     public void UpdateVelocity(ref Vector3 currentVelocity, float deltaTime)
     {
         var isGrounded = m_motor.GroundingStatus.IsStableOnGround;
 
-        // ÀÌµ¿ ·ÎÁ÷
+        // ì´ë™ ë¡œì§
         var finalVelocity = m_playerViewModel.CalculateVelocity(
                 currentVelocity,
                 m_mainCameraTransform.rotation,
@@ -53,10 +59,10 @@ public class PlayerCharacterView : MonoBehaviour, ICharacterController
                 deltaTime
             );
 
-        // Á¡ÇÁ ·ÎÁ÷
+        // ì í”„ ë¡œì§
         if (m_jumpRequested)
         {
-            // ¶¥¿¡ ÀÖÀ»¶§ Á¡ÇÁ
+            // ë•…ì— ìˆì„ë•Œ ì í”„
             if (isGrounded)
             {
                 m_motor.ForceUnground();
@@ -67,7 +73,7 @@ public class PlayerCharacterView : MonoBehaviour, ICharacterController
             m_jumpRequested = false;
         }
 
-        // ÃÖÁ¾ ¼Óµµ Àû¿ë
+        // ìµœì¢… ì†ë„ ì ìš©
         currentVelocity = finalVelocity;
     }
 

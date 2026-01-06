@@ -3,14 +3,15 @@ using UnityEngine;
 
 public class PlayerViewModel
 {
-    // ÀÔ·Â°ª
+    // ì…ë ¥ê°’
     public ReactiveProperty<Vector2> InputDirection { get; } = new(Vector2.zero);
     public Subject<Unit> JumpRequest { get; } = new();
+    public ReactiveProperty<bool> IsSprinting { get; } = new(false);
 
-    // »óÅÂ
+    // ìƒíƒœ
     public ReadOnlyReactiveProperty<bool> IsMoving { get; }
 
-    // Model ¼³Á¤°ª
+    // Model ì„¤ì •ê°’
     private readonly PlayerStats playerStats;
 
     public PlayerViewModel(PlayerStats stats)
@@ -23,7 +24,7 @@ public class PlayerViewModel
     }
     
     /// <summary>
-    /// KCC UpdateRotation¿¡¼­ È£ÃâÇÒ Ä³¸¯ÅÍ È¸Àü ÇÔ¼ö
+    /// KCC UpdateRotationì—ì„œ í˜¸ì¶œí•  ìºë¦­í„° íšŒì „ í•¨ìˆ˜
     /// </summary>
     public Quaternion CalculateTargetRotation(Quaternion currentRotation, Quaternion cameraRotation, float deltaTime)
     {
@@ -31,11 +32,11 @@ public class PlayerViewModel
 
         if(input.sqrMagnitude < 0.001f)
         {
-            // ÀÔ·ÂÀÌ ¾øÀ¸¸é ÇöÀç È¸Àü°ª À¯Áö
+            // ì…ë ¥ì´ ì—†ìœ¼ë©´ í˜„ì¬ íšŒì „ê°’ ìœ ì§€
             return currentRotation;
         }
 
-        // ÇöÀç Ä«¸Ş¶óÀÇ È¸Àü°ªÀ» ±âÁØÀ¸·Î ¾Õ, ¿À¸¥ÂÊ ¹æÇâ ±¸ÇÔ
+        // í˜„ì¬ ì¹´ë©”ë¼ì˜ íšŒì „ê°’ì„ ê¸°ì¤€ìœ¼ë¡œ ì•, ì˜¤ë¥¸ìª½ ë°©í–¥ êµ¬í•¨
         var cameraForward = cameraRotation * Vector3.forward;
         var cameraRight = cameraRotation * Vector3.right;
 
@@ -44,7 +45,7 @@ public class PlayerViewModel
         cameraForward.Normalize();
         cameraRight.Normalize();
     
-        // ÀÔ·Â ¹æÇâ°ú Ä«¸Ş¶ó ¹æÇâ
+        // ì…ë ¥ ë°©í–¥ê³¼ ì¹´ë©”ë¼ ë°©í–¥
         Vector3 targetDirection = (cameraForward * input.y + cameraRight * input.x).normalized;
 
         if(targetDirection.sqrMagnitude > 0.001f)
@@ -58,14 +59,14 @@ public class PlayerViewModel
     }
 
     /// <summary>
-    /// KCC°¡ È£ÃâÇÒ ÀÌµ¿ ¼Óµµ °è»ê ÇÔ¼ö
+    /// KCCê°€ í˜¸ì¶œí•  ì´ë™ ì†ë„ ê³„ì‚° í•¨ìˆ˜
     /// </summary>
     public Vector3 CalculateVelocity(Vector3 currentVelocity, Quaternion cameraRotation, bool isGrounded, float deltaTime)
     {
-        // ÀÔ·Â°ª °¡Á®¿À±â
+        // ì…ë ¥ê°’ ê°€ì ¸ì˜¤ê¸°
         var input = InputDirection.CurrentValue;
 
-        // ÀÌµ¿ ¹æÇâ °è»ê
+        // ì´ë™ ë°©í–¥ ê³„ì‚°
         var moveDir = Vector3.zero;
         if (input.sqrMagnitude > 0.001f)
         {
@@ -80,10 +81,13 @@ public class PlayerViewModel
             moveDir = (camForward * input.y + camRight * input.x).normalized;
         }
 
-        // ¸ñÇ¥ ¼öÆò ¼Óµµ
-        var targetVelocity = moveDir * playerStats.MoveSpeed;
+        // ë‹¬ë¦¬ê¸° ìƒíƒœì— ë”°ë¼ ì†ë„ ì„ íƒ
+        var speedMultiplier = IsSprinting.Value ? playerStats.SprintMultiplier : 1; 
 
-        // ¼öÁ÷ ¼Óµµ, Áß·Â Ã³¸®
+        // ëª©í‘œ ìˆ˜í‰ ì†ë„
+        var targetVelocity = moveDir * playerStats.MoveSpeed * speedMultiplier;
+
+        // ìˆ˜ì§ ì†ë„, ì¤‘ë ¥ ì²˜ë¦¬
         var yVelocity = currentVelocity.y;
 
         if(isGrounded)
@@ -95,7 +99,7 @@ public class PlayerViewModel
             yVelocity += playerStats.Gravity * deltaTime;
         }
 
-        // ÃÖÁ¾ ÇÕ¼º
+        // ìµœì¢… í•©ì„±
         return new Vector3(targetVelocity.x, yVelocity, targetVelocity.z);
     }
 
