@@ -7,6 +7,7 @@ public class PlayerCharacterView : MonoBehaviour, ICharacterController
     [Header("Reference")]
     [SerializeField] private KinematicCharacterMotor m_motor;
     [SerializeField] private GameInputReader m_inputReader;
+    [SerializeField] private Transform m_visualTransform;
 
     [Header("Setting")]
     [SerializeField] private PlayerStats m_playerStat;
@@ -45,8 +46,20 @@ public class PlayerCharacterView : MonoBehaviour, ICharacterController
         m_inputReader.SprintInput
             .Subscribe(value => m_playerViewModel.IsSprinting.Value = value)
             .AddTo(this);
+
+        // 웅크리기 입력
+        m_inputReader.CrouchInput
+            .Subscribe(value => m_playerViewModel.IsCrouching.Value = value)
+            .AddTo(this);
+
+        // 웅크리기 상태에 따라 Capsule크기 변경
+        m_inputReader.CrouchInput
+            .DistinctUntilChanged() // 값이 바뀔때만 실행
+            .Subscribe(HandleCrouchChange)
+            .AddTo(this);
     }
 
+    #region KCC 함수
     public void UpdateVelocity(ref Vector3 currentVelocity, float deltaTime)
     {
         var isGrounded = m_motor.GroundingStatus.IsStableOnGround;
@@ -121,4 +134,22 @@ public class PlayerCharacterView : MonoBehaviour, ICharacterController
     public void PostGroundingUpdate(float deltaTime)
     {
     }
+    #endregion
+
+    #region 내부 함수
+    private void HandleCrouchChange(bool isCrouching)
+    {
+        var targetHeight = isCrouching ? m_playerStat.CrouchHeight : m_playerStat.NormalHeight;
+
+        m_motor.SetCapsuleDimensions(
+            m_playerStat.Radius,
+            targetHeight,
+            targetHeight * 0.5f
+            );
+
+        var heightRatio = isCrouching ?
+            (m_playerStat.CrouchHeight / m_playerStat.NormalHeight) : 1f;
+        m_visualTransform.localScale = new Vector3(1f, heightRatio, 1f);
+    }
+    #endregion
 }

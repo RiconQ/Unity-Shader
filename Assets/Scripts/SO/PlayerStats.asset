@@ -14,7 +14,11 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::PlayerStats
   RotationSpeed: 40
   MoveSpeed: 10
-  SprintMultiplier: 2
-  JumpForce: 2
+  SprintSpeed: 20
+  CrouchSpeed: 7
+  JumpForce: 4
   Gravity: -30
   AirDrag: 0.1
+  NormalHeight: 2
+  CrouchHeight: 1
+  Radius: 0.5

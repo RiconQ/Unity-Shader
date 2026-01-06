@@ -6,10 +6,11 @@ public class PlayerViewModel
     // 입력값
     public ReactiveProperty<Vector2> InputDirection { get; } = new(Vector2.zero);
     public Subject<Unit> JumpRequest { get; } = new();
-    public ReactiveProperty<bool> IsSprinting { get; } = new(false);
 
     // 상태
     public ReadOnlyReactiveProperty<bool> IsMoving { get; }
+    public ReactiveProperty<bool> IsSprinting { get; } = new(false);
+    public ReactiveProperty<bool> IsCrouching { get; } = new(false);
 
     // Model 설정값
     private readonly PlayerStats playerStats;
@@ -81,11 +82,23 @@ public class PlayerViewModel
             moveDir = (camForward * input.y + camRight * input.x).normalized;
         }
 
-        // 달리기 상태에 따라 속도 선택
-        var speedMultiplier = IsSprinting.Value ? playerStats.SprintMultiplier : 1; 
+        // 속도 우선 순위 로직
+        // 1. 웅크리기 중이면 CrouchSpeed
+        // 2. 아니라면 -> 달리기 중이면 SprintSpeed
+        // 3. 둘다 아니라면 MoveSpeed
+        var targetSpeed = playerStats.MoveSpeed;
+
+        if(IsCrouching.Value)
+        {
+            targetSpeed = playerStats.CrouchSpeed;
+        }
+        else if(IsSprinting.Value)
+        {
+            targetSpeed = playerStats.SprintSpeed;
+        }
 
         // 목표 수평 속도
-        var targetVelocity = moveDir * playerStats.MoveSpeed * speedMultiplier;
+        var targetVelocity = moveDir * targetSpeed;
 
         // 수직 속도, 중력 처리
         var yVelocity = currentVelocity.y;

@@ -954,7 +954,7 @@ GameObject:
   m_Component:
   - component: {fileID: 812853937}
   m_Layer: 7
-  m_Name: Root
+  m_Name: Visual Root
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -1766,9 +1766,9 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 2125001339}
+  - component: {fileID: 2125001340}
   - component: {fileID: 2125001342}
   - component: {fileID: 2125001341}
-  - component: {fileID: 2125001340}
   m_Layer: 7
   m_Name: Character
   m_TagString: Untagged
@@ -1807,6 +1807,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::PlayerCharacter
   m_motor: {fileID: 2125001341}
   m_inputReader: {fileID: 540360879}
+  m_visualTransform: {fileID: 812853937}
   m_playerStat: {fileID: 11400000, guid: 6c13cf893be95ab428af9afa22640aca, type: 2}
 --- !u!114 &2125001341
 MonoBehaviour:
