@@ -16,6 +16,9 @@ public class PlayerCharacterView : MonoBehaviour, ICharacterController
     private Transform m_mainCameraTransform;
     private bool m_jumpRequested = false;
 
+    // DebugUI용 ViewModel
+    public PlayerViewModel PlayerViewModel => m_playerViewModel;
+
     private void Awake()
     {
         m_motor.CharacterController = this;

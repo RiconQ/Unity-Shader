@@ -17,6 +17,9 @@ MonoBehaviour:
   SprintSpeed: 20
   CrouchSpeed: 7
   JumpForce: 4
+  SlideSpeed: 22
+  SlideFriction: 15
+  SlideThreshold: 7
   Gravity: -30
   AirDrag: 0.1
   NormalHeight: 2

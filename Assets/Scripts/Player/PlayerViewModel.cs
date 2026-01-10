@@ -11,9 +11,14 @@ public class PlayerViewModel
     public ReadOnlyReactiveProperty<bool> IsMoving { get; }
     public ReactiveProperty<bool> IsSprinting { get; } = new(false);
     public ReactiveProperty<bool> IsCrouching { get; } = new(false);
+    public ReactiveProperty<bool> IsSliding { get; } = new(false);
 
     // Model 설정값
     private readonly PlayerStats playerStats;
+
+    // 내부 계산용 변수
+    private Vector3 m_slideDirection; // 슬라이딩 방향
+    private float m_currentSlideSpeed; // 슬라이딩 중 속도 관리
 
     public PlayerViewModel(PlayerStats stats)
     {
@@ -23,7 +28,7 @@ public class PlayerViewModel
             .Select(vector => vector.sqrMagnitude > 0.001f)
             .ToReadOnlyReactiveProperty();
     }
-    
+
     /// <summary>
     /// KCC UpdateRotation에서 호출할 캐릭터 회전 함수
     /// </summary>
@@ -31,7 +36,7 @@ public class PlayerViewModel
     {
         var input = InputDirection.Value;
 
-        if(input.sqrMagnitude < 0.001f)
+        if (input.sqrMagnitude < 0.001f)
         {
             // 입력이 없으면 현재 회전값 유지
             return currentRotation;
@@ -45,11 +50,11 @@ public class PlayerViewModel
         cameraRight.y = 0;
         cameraForward.Normalize();
         cameraRight.Normalize();
-    
+
         // 입력 방향과 카메라 방향
         Vector3 targetDirection = (cameraForward * input.y + cameraRight * input.x).normalized;
 
-        if(targetDirection.sqrMagnitude > 0.001f)
+        if (targetDirection.sqrMagnitude > 0.001f)
         {
             var targetRotation = Quaternion.LookRotation(targetDirection, Vector3.up);
 
@@ -64,60 +69,133 @@ public class PlayerViewModel
     /// </summary>
     public Vector3 CalculateVelocity(Vector3 currentVelocity, Quaternion cameraRotation, bool isGrounded, float deltaTime)
     {
-        // 입력값 가져오기
-        var input = InputDirection.CurrentValue;
+        // 슬라이딩 상태 갱신
+        UpdateSlidingState(currentVelocity, isGrounded);
 
-        // 이동 방향 계산
-        var moveDir = Vector3.zero;
-        if (input.sqrMagnitude > 0.001f)
+        // 수평 속도 계산
+        var planarVelocity = CalculatePlanarVelocity(cameraRotation, deltaTime);
+
+        // 수직 속도 계산
+        var yVelocity = CalculateVerticalVelocity(currentVelocity.y, isGrounded, deltaTime);
+
+        // 최종 속도 반환
+        return new Vector3(planarVelocity.x, yVelocity, planarVelocity.z);
+    }
+
+    /// <summary>
+    /// 플레이어의 점프 시작 속도를 계산
+    /// </summary>
+    public float CalculateJumpVelocity()
+    {
+        return Mathf.Sqrt(2f * -playerStats.Gravity * playerStats.JumpForce);
+    }
+
+    /// <summary>
+    /// 슬라이딩 진입 및 해제 조건을 체크하고 상태를 업데이트
+    /// </summary>
+    private void UpdateSlidingState(Vector3 currentVelocity, bool isGrounded)
+    {
+        // 현재 수평 이동 벡터
+        var currentPlanarVelocity = new Vector3(currentVelocity.x, 0, currentVelocity.z);
+        //현재 수평 이동 속도
+        var currentSpeed = currentPlanarVelocity.magnitude;
+
+        var isCrouchInput = IsCrouching.Value;
+        var isSliding = IsSliding.Value;
+
+        // 슬라이딩 진입 조건 :
+        // 땅에 있고 && 웅크리기 키가 입력되고 && 슬라이딩 상태가 아니고 && 속도가 충분하다면
+        if (isGrounded && isCrouchInput && !isSliding
+            && currentSpeed > playerStats.MoveSpeed + 0.1f)
         {
-            var camForward = cameraRotation * Vector3.forward;
-            var camRight = cameraRotation * Vector3.right;
+            IsSliding.Value = true;
 
-            camForward.y = 0;
-            camRight.y = 0;
-            camForward.Normalize();
-            camRight.Normalize();
+            // 슬라이딩 방향 고정 및 초기 속도 설정
+            m_slideDirection = currentPlanarVelocity.normalized;
+            if (m_slideDirection.magnitude < 0.01f)
+            {
+                m_slideDirection = Vector3.forward;
+            }
+            m_currentSlideSpeed = playerStats.SlideSpeed;
 
-            moveDir = (camForward * input.y + camRight * input.x).normalized;
+
+        }
+        // 슬라이딩 해제 조건
+        // 웅크리기 키를 뗌 || 속도가 느림 || 공중
+        else if (isSliding && (!isCrouchInput || m_currentSlideSpeed < playerStats.SlideThreshold || !isGrounded))
+        {
+            IsSliding.Value = false;
+        }
+    }
+
+    /// <summary>
+    /// 현재 상태(슬라이딩, 일반)에 따라 수평 속도 계산
+    /// </summary>
+    private Vector3 CalculatePlanarVelocity(Quaternion cameraRotation, float deltaTime)
+    {
+        if (IsSliding.Value)
+        {
+            // 마찰력 적용
+            m_currentSlideSpeed -= playerStats.SlideFriction * deltaTime;
+            m_currentSlideSpeed = Mathf.Max(m_currentSlideSpeed, 0);
+
+            return m_slideDirection * m_currentSlideSpeed;
         }
 
-        // 속도 우선 순위 로직
-        // 1. 웅크리기 중이면 CrouchSpeed
-        // 2. 아니라면 -> 달리기 중이면 SprintSpeed
-        // 3. 둘다 아니라면 MoveSpeed
-        var targetSpeed = playerStats.MoveSpeed;
+        // 일반 이동 속도 계산
+        return CalculateStandardMovement(cameraRotation);
+    }
 
-        if(IsCrouching.Value)
+    /// <summary>
+    /// WASD 기반의 일반 이동 속도 계산
+    /// </summary>
+    private Vector3 CalculateStandardMovement(Quaternion cameraRotation)
+    {
+        var input = InputDirection.CurrentValue;
+        if (input.sqrMagnitude < 0.001f)
+        {
+            return Vector3.zero;
+        }
+
+        // 카메라 기준 방향 계산
+        var camForward = cameraRotation * Vector3.forward;
+        var camRight = cameraRotation * Vector3.right;
+        camForward.y = 0;
+        camRight.y = 0;
+        camForward.Normalize();
+        camRight.Normalize();
+
+        var moveDir = (camForward * input.y + camRight * input.x).normalized;
+
+        // 속도 결정
+        // 우선순위 : 웅크리기 > 달리기 > 걷기
+        var targetSpeed = playerStats.MoveSpeed;
+        if (IsCrouching.Value)
         {
             targetSpeed = playerStats.CrouchSpeed;
         }
-        else if(IsSprinting.Value)
+        else if (IsSprinting.Value)
         {
             targetSpeed = playerStats.SprintSpeed;
         }
 
-        // 목표 수평 속도
-        var targetVelocity = moveDir * targetSpeed;
+        // 방향 * 속도 반환
+        return moveDir * targetSpeed;
+    }
 
-        // 수직 속도, 중력 처리
-        var yVelocity = currentVelocity.y;
-
-        if(isGrounded)
+    /// <summary>
+    /// 중력 및 접지 처리
+    /// </summary>
+    private float CalculateVerticalVelocity(float currentYVelocity, bool isGrounded, float deltaTime)
+    {
+        if (isGrounded)
         {
-            yVelocity = -0.1f;
+            // 바닥 밀착용
+            return -0.1f;
         }
         else
         {
-            yVelocity += playerStats.Gravity * deltaTime;
+            return currentYVelocity + (playerStats.Gravity * deltaTime);
         }
-
-        // 최종 합성
-        return new Vector3(targetVelocity.x, yVelocity, targetVelocity.z);
-    }
-
-    public float CalculateJumpVelocity()
-    {
-        return Mathf.Sqrt(2f * -playerStats.Gravity * playerStats.JumpForce);
     }
 }
